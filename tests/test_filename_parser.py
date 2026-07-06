@@ -74,6 +74,26 @@ def test_parse_filename_without_lap_time() -> None:
     assert metadata.lap_time_seconds is None
 
 
+def test_parse_garage61_prefix_non_matching_format_with_lap_time() -> None:
+    metadata = parse_filename("Garage61_malformed_01.50.123.csv")
+    assert metadata.original_filename == "Garage61_malformed_01.50.123.csv"
+    assert metadata.driver is None
+    assert metadata.car is None
+    assert metadata.track is None
+    assert metadata.lap_time == "01.50.123"
+    assert metadata.lap_time_seconds == pytest.approx(110.123)
+
+
+def test_parse_garage61_prefix_non_matching_format_without_lap_time() -> None:
+    metadata = parse_filename("Garage61_incomplete.csv")
+    assert metadata.original_filename == "Garage61_incomplete.csv"
+    assert metadata.driver is None
+    assert metadata.car is None
+    assert metadata.track is None
+    assert metadata.lap_time is None
+    assert metadata.lap_time_seconds is None
+
+
 def test_lap_time_to_seconds() -> None:
     assert lap_time_to_seconds("01.53.244") == pytest.approx(113.244)
     assert lap_time_to_seconds("01.56.068") == pytest.approx(116.068)

@@ -13,6 +13,7 @@ from src.telemetry import (
     build_telemetry_summary,
     classify_and_select_laps,
     discover_csv_files,
+    write_telemetry_summary,
 )
 
 
@@ -113,6 +114,72 @@ def test_map_columns_returns_null_for_missing_fields() -> None:
     assert mapped["speed"] == "Speed"
     assert mapped["brake"] == "Brake"
     assert mapped["throttle"] is None
+
+
+def test_discover_csv_files_missing_dir(tmp_path: Path) -> None:
+    with pytest.raises(TelemetryDiscoveryError, match="Data directory not found"):
+        discover_csv_files(tmp_path / "nonexistent")
+
+
+def test_discover_csv_files_empty_dir(tmp_path: Path) -> None:
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(TelemetryDiscoveryError, match="No CSV files found"):
+        discover_csv_files(empty)
+
+
+def test_classify_multiple_user_laps_picks_first_alphabetically(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    _write_sample_csv(
+        data_dir
+        / "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.56.068.csv"
+    )
+    _write_sample_csv(
+        data_dir
+        / "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.57.000.csv"
+    )
+    _write_sample_csv(
+        data_dir
+        / "Garage61_DanielLewis_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.244.csv"
+    )
+    csv_files = discover_csv_files(data_dir)
+    user_path, reference_paths = classify_and_select_laps(csv_files)
+
+    assert "01.56.068" in user_path.name
+    assert len(reference_paths) == 1
+
+
+def test_references_without_lap_time_sorted_last(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    _write_sample_csv(
+        data_dir
+        / "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.56.068.csv"
+    )
+    _write_sample_csv(data_dir / "ref_no_time.csv")
+    _write_sample_csv(
+        data_dir
+        / "Garage61_DanielLewis_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.244.csv"
+    )
+    csv_files = discover_csv_files(data_dir)
+    _, reference_paths = classify_and_select_laps(csv_files)
+
+    assert "DanielLewis" in reference_paths[0].name
+    assert reference_paths[1].name == "ref_no_time.csv"
+
+
+def test_write_telemetry_summary_creates_file(sample_data_dir: Path, tmp_path: Path) -> None:
+    output_path = tmp_path / "out" / "telemetry_summary.json"
+    summary = write_telemetry_summary(sample_data_dir, output_path)
+
+    assert output_path.exists()
+    import json
+
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    assert written == summary
+    assert "user_lap" in written
+    assert len(written["reference_laps"]) == 3
 
 
 @pytest.mark.skipif(
