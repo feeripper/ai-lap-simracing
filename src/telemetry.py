@@ -32,7 +32,18 @@ class LapSummary:
 
     @classmethod
     def from_csv(cls, csv_path: Path, metadata: FilenameMetadata) -> LapSummary:
-        df = pd.read_csv(csv_path, nrows=0)
+        try:
+            df = pd.read_csv(csv_path, nrows=0)
+        except pd.errors.EmptyDataError as exc:
+            raise TelemetryDiscoveryError(f"CSV file is empty: {csv_path}") from exc
+        except (pd.errors.ParserError, UnicodeDecodeError) as exc:
+            raise TelemetryDiscoveryError(
+                f"Failed to parse CSV file {csv_path}: {exc}"
+            ) from exc
+        except OSError as exc:
+            raise TelemetryDiscoveryError(
+                f"Failed to read CSV file {csv_path}: {exc}"
+            ) from exc
         available_columns = list(df.columns)
         return cls(
             filename=metadata.original_filename,
@@ -113,6 +124,13 @@ def build_telemetry_summary(data_dir: Path) -> dict:
 
 def write_telemetry_summary(data_dir: Path, output_path: Path) -> dict:
     summary = build_telemetry_summary(data_dir)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        raise TelemetryDiscoveryError(
+            f"Failed to write telemetry summary to {output_path}: {exc}"
+        ) from exc
     return summary

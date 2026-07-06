@@ -115,6 +115,33 @@ def test_map_columns_returns_null_for_missing_fields() -> None:
     assert mapped["throttle"] is None
 
 
+def test_empty_csv_raises_discovery_error(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    _write_sample_csv(
+        data_dir / "Garage61_DanielLewis_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.244.csv"
+    )
+    empty = (
+        data_dir
+        / "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.56.068.csv"
+    )
+    empty.write_text("", encoding="utf-8")
+
+    with pytest.raises(TelemetryDiscoveryError, match="CSV file is empty"):
+        build_telemetry_summary(data_dir)
+
+
+def test_write_error_raises_discovery_error(sample_data_dir: Path, tmp_path: Path) -> None:
+    from src.telemetry import write_telemetry_summary
+
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a dir", encoding="utf-8")
+    output_path = blocker / "telemetry_summary.json"
+
+    with pytest.raises(TelemetryDiscoveryError, match="Failed to write telemetry summary"):
+        write_telemetry_summary(sample_data_dir, output_path)
+
+
 @pytest.mark.skipif(
     not Path("data").exists() or not any(Path("data").glob("*.csv")),
     reason="Real CSV files not available in data/",

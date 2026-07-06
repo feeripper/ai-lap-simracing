@@ -77,3 +77,17 @@ def test_parse_filename_without_lap_time() -> None:
 def test_lap_time_to_seconds() -> None:
     assert lap_time_to_seconds("01.53.244") == pytest.approx(113.244)
     assert lap_time_to_seconds("01.56.068") == pytest.approx(116.068)
+
+
+@pytest.mark.parametrize("bad", ["01.53", "not.a.time", "01.53.244.999"])
+def test_lap_time_to_seconds_rejects_malformed(bad: str) -> None:
+    with pytest.raises(ValueError, match="Invalid lap time"):
+        lap_time_to_seconds(bad)
+
+
+def test_malformed_garage61_filename_warns(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("WARNING"):
+        metadata = parse_filename("Garage61_incomplete_01.53.244.csv")
+    assert metadata.driver is None
+    assert metadata.lap_time == "01.53.244"
+    assert any("does not match the expected" in record.message for record in caplog.records)

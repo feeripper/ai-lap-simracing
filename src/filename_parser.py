@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 LAP_TIME_PATTERN = re.compile(r"(\d{2}\.\d{2}\.\d{3})\.csv$", re.IGNORECASE)
 GARAGE61_FILENAME_PATTERN = re.compile(
@@ -24,9 +27,18 @@ class FilenameMetadata:
 
 def lap_time_to_seconds(lap_time: str) -> float:
     """Convert MM.SS.mmm lap time string to total seconds."""
-    minutes, rest = lap_time.split(".", 1)
-    seconds, milliseconds = rest.split(".", 1)
-    return int(minutes) * 60 + int(seconds) + int(milliseconds) / 1000
+    parts = lap_time.split(".")
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid lap time {lap_time!r}: expected MM.SS.mmm format."
+        )
+    minutes, seconds, milliseconds = parts
+    try:
+        return int(minutes) * 60 + int(seconds) + int(milliseconds) / 1000
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid lap time {lap_time!r}: expected MM.SS.mmm format."
+        ) from exc
 
 
 def parse_filename(filename: str) -> FilenameMetadata:
@@ -55,6 +67,11 @@ def parse_filename(filename: str) -> FilenameMetadata:
             lap_time_seconds=lap_time_to_seconds(lap_time),
         )
 
+    logger.warning(
+        "Filename %r looks like a Garage61 export but does not match the expected "
+        "'driver_car_track_MM.SS.mmm' pattern; driver, car and track will be unset.",
+        filename,
+    )
     lap_time_match = LAP_TIME_PATTERN.search(filename)
     lap_time = lap_time_match.group(1) if lap_time_match else None
     return FilenameMetadata(

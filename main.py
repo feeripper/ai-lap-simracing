@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ OUTPUT_PATH = Path("outputs/telemetry_summary.json")
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     try:
         summary = write_telemetry_summary(DATA_DIR, OUTPUT_PATH)
     except TelemetryDiscoveryError as exc:
