@@ -29,19 +29,24 @@ def lap_time_to_seconds(lap_time: str) -> float:
     return int(minutes) * 60 + int(seconds) + int(milliseconds) / 1000
 
 
+def _build_fallback_metadata(filename: str) -> FilenameMetadata:
+    """Build metadata with only lap time extracted (no driver/car/track)."""
+    lap_time_match = LAP_TIME_PATTERN.search(filename)
+    lap_time = lap_time_match.group(1) if lap_time_match else None
+    return FilenameMetadata(
+        original_filename=filename,
+        driver=None,
+        car=None,
+        track=None,
+        lap_time=lap_time,
+        lap_time_seconds=lap_time_to_seconds(lap_time) if lap_time else None,
+    )
+
+
 def parse_filename(filename: str) -> FilenameMetadata:
     """Extract driver, car, track and lap time from a Garage61-style filename."""
     if not filename.lower().startswith("garage61_"):
-        lap_time_match = LAP_TIME_PATTERN.search(filename)
-        lap_time = lap_time_match.group(1) if lap_time_match else None
-        return FilenameMetadata(
-            original_filename=filename,
-            driver=None,
-            car=None,
-            track=None,
-            lap_time=lap_time,
-            lap_time_seconds=lap_time_to_seconds(lap_time) if lap_time else None,
-        )
+        return _build_fallback_metadata(filename)
 
     match = GARAGE61_FILENAME_PATTERN.match(filename)
     if match:
@@ -55,13 +60,4 @@ def parse_filename(filename: str) -> FilenameMetadata:
             lap_time_seconds=lap_time_to_seconds(lap_time),
         )
 
-    lap_time_match = LAP_TIME_PATTERN.search(filename)
-    lap_time = lap_time_match.group(1) if lap_time_match else None
-    return FilenameMetadata(
-        original_filename=filename,
-        driver=None,
-        car=None,
-        track=None,
-        lap_time=lap_time,
-        lap_time_seconds=lap_time_to_seconds(lap_time) if lap_time else None,
-    )
+    return _build_fallback_metadata(filename)

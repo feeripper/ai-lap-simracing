@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -10,12 +9,13 @@ import pandas as pd
 
 from src.column_mapper import map_columns
 from src.filename_parser import FilenameMetadata, parse_filename
+from src.io_utils import DataDirectoryError, validate_data_dir, write_json
 
 USER_DRIVER_MARKER = "FelippeAraujo"
 MAX_REFERENCE_LAPS = 3
 
 
-class TelemetryDiscoveryError(Exception):
+class TelemetryDiscoveryError(DataDirectoryError):
     """Raised when CSV discovery or classification requirements are not met."""
 
 
@@ -59,14 +59,10 @@ def _sort_key_for_references(metadata: FilenameMetadata) -> tuple[int, float, st
 
 def discover_csv_files(data_dir: Path) -> list[Path]:
     """Return all CSV files in data_dir sorted by filename."""
-    if not data_dir.is_dir():
-        raise TelemetryDiscoveryError(f"Data directory not found: {data_dir}")
-
-    csv_files = sorted(data_dir.glob("*.csv"))
-    if not csv_files:
-        raise TelemetryDiscoveryError(f"No CSV files found in {data_dir}")
-
-    return csv_files
+    try:
+        return validate_data_dir(data_dir, glob_pattern="*.csv")
+    except DataDirectoryError as exc:
+        raise TelemetryDiscoveryError(str(exc)) from exc
 
 
 def classify_and_select_laps(
@@ -113,6 +109,5 @@ def build_telemetry_summary(data_dir: Path) -> dict:
 
 def write_telemetry_summary(data_dir: Path, output_path: Path) -> dict:
     summary = build_telemetry_summary(data_dir)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_json(summary, output_path)
     return summary

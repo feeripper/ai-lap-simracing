@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from src.column_mapper import map_columns
@@ -14,41 +13,7 @@ from src.telemetry import (
     classify_and_select_laps,
     discover_csv_files,
 )
-
-
-GARAGE61_COLUMNS = [
-    "Speed",
-    "LapDistPct",
-    "Lat",
-    "Lon",
-    "Brake",
-    "Throttle",
-    "RPM",
-    "SteeringWheelAngle",
-    "Gear",
-]
-
-
-def _write_sample_csv(path: Path) -> None:
-    pd.DataFrame({col: [0.0] for col in GARAGE61_COLUMNS}).to_csv(path, index=False)
-
-
-@pytest.fixture
-def sample_data_dir(tmp_path: Path) -> Path:
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-
-    files = {
-        "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.56.068.csv": "user",
-        "Garage61_DanielLewis_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.244.csv": "ref",
-        "Garage61_RomanRichtr_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.472.csv": "ref",
-        "Garage61_TravisBumgarner_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.55.695.csv": "ref",
-        "Garage61_SlowerDriver_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.58.000.csv": "ref",
-    }
-    for filename in files:
-        _write_sample_csv(data_dir / filename)
-
-    return data_dir
+from tests.conftest import GARAGE61_COLUMNS, write_sample_csv
 
 
 def test_discover_csv_files(sample_data_dir: Path) -> None:
@@ -89,7 +54,7 @@ def test_build_telemetry_summary_structure(sample_data_dir: Path) -> None:
 def test_requires_user_lap(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    _write_sample_csv(
+    write_sample_csv(
         data_dir / "Garage61_DanielLewis_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.53.244.csv"
     )
 
@@ -100,7 +65,7 @@ def test_requires_user_lap(tmp_path: Path) -> None:
 def test_requires_reference_lap(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    _write_sample_csv(
+    write_sample_csv(
         data_dir / "Garage61_FelippeAraujo_AudiRS3LMSGen2TCR_WatkinsGlenInternational(Boot)_01.56.068.csv"
     )
 
