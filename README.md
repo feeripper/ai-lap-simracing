@@ -1,37 +1,40 @@
 # AI Lap Simracing
 
-AI Lap Simracing is an AI telemetry coach for iRacing.
+AI Lap Simracing é um coach de telemetria para simracing (iRacing) que compara sua volta contra voltas de referência e gera insights práticos de pilotagem.
 
-It uses Garage61 telemetry to compare your lap against 3 fast laps from fast drivers in the same car and track, then generates practical coaching insights about braking, steering, throttle, gear usage and corner performance.
+## Status do MVP
 
-## MVP
+O MVP local está funcional com:
+- Normalização de voltas por distância
+- Comparação numérica de telemetria
+- Geração de insights de coaching
+- Pipeline local ponta a ponta
+- CLI para análise com CSVs
+- Banco de dados para voltas de referência
 
-The first MVP is local and simple.
+## Documentação
 
-Input:
+A documentação completa está disponível em `docs/` e pode ser publicada via GitHub Pages.
 
-- `data/minha_volta.csv`
-- `data/referencia_1.csv`
-- `data/referencia_2.csv`
-- `data/referencia_3.csv`
-- `tracks/<track>.json`
+- [Visão Geral](docs/index.md)
+- [Começando](docs/getting-started.md)
+- [Uso Local](docs/local-usage.md)
+- [Voltas de Referência](docs/reference-laps.md)
+- [Comandos CLI](docs/cli-commands.md)
+- [Formato CSV](docs/telemetry-csv-format.md)
+- [Arquitetura](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
 
-Output:
+## Comandos Rápidos
 
-- `outputs/telemetry_summary.json`
-- `outputs/insights.json`
-- `outputs/relatorio.txt`
+```powershell
+# Criar ambiente virtual
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-## Initial stack
+# Instalar dependências
+pip install -r requirements.txt
 
-- Python 3.12
-- pandas
-- numpy
-- pydantic
-- pytest
-
-## Main rule
-
-Do not start with frontend, login, database, API or automatic Garage61 integration.
-
-Start with local CSV analysis.
+# Rodar testes
+pytest -v
+```
