@@ -14,16 +14,17 @@ O MVP local está funcional com:
 
 ## Documentação
 
-A documentação completa está disponível em `docs/` e pode ser publicada via GitHub Pages.
+A documentação completa está disponível em `docs-site/` e é publicada automaticamente via GitHub Pages em: https://feeripper.github.io/ai-lap-simracing/
 
-- [Visão Geral](docs/index.md)
-- [Começando](docs/getting-started.md)
-- [Uso Local](docs/local-usage.md)
-- [Voltas de Referência](docs/reference-laps.md)
-- [Comandos CLI](docs/cli-commands.md)
-- [Formato CSV](docs/telemetry-csv-format.md)
-- [Arquitetura](docs/architecture.md)
-- [Roadmap](docs/roadmap.md)
+> A documentação é publicada via Docusaurus e GitHub Actions. Em **Settings → Pages**, selecione **GitHub Actions** como source.
+
+Para rodar a documentação localmente:
+
+```powershell
+cd docs-site
+npm install
+npm start
+```
 
 ## Comandos Rápidos
 
