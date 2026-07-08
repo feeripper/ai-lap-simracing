@@ -12,3 +12,4 @@ outputs/*
 
 .DS_Store
 .cursor/
+ai_lap.db
