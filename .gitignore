@@ -1,23 +1,43 @@
-.env
+# Python environments
 .venv/
 venv/
-__pycache__/
-*.pyc
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local databases
+ai_lap.db
+*.sqlite
+*.sqlite3
+
+# Local data and outputs
 data/*
 outputs/*
 
+# Keep .gitkeep files for empty directories
 !data/.gitkeep
 !outputs/.gitkeep
 
-.DS_Store
-.cursor/
-ai_lap.db
+# Node.js
+node_modules/
+docs-site/node_modules/
 
-docs-site/node_modules/
+# Docusaurus build artifacts
 docs-site/build/
-node_modules/
 docs-site/.docusaurus/
-docs-site/node_modules/
-docs-site/build/
-node_modules/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.cursor/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
