@@ -13,3 +13,11 @@ outputs/*
 .DS_Store
 .cursor/
 ai_lap.db
+
+docs-site/node_modules/
+docs-site/build/
+node_modules/
+docs-site/.docusaurus/
+docs-site/node_modules/
+docs-site/build/
+node_modules/
