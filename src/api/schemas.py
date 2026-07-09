@@ -46,6 +46,15 @@ class ReferenceLapOut(BaseModel):
     simulator: str
     car: str
     track: str
+    source: str = "manual"
+    source_lap_id: Optional[str] = None
+    source_url: Optional[str] = None
+    track_layout: Optional[str] = None
+    imported_at: Optional[datetime] = None
+    file_checksum: Optional[str] = None
+    validation_status: str = "validated"
+    raw_metadata_json: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class CatalogOut(BaseModel):

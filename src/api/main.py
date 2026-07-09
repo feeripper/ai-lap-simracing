@@ -149,6 +149,15 @@ def list_reference_laps(db: Session = Depends(get_db)):
             simulator=lap.simulator.name,
             car=lap.car.name,
             track=lap.track.name,
+            source=lap.source,
+            source_lap_id=lap.source_lap_id,
+            source_url=lap.source_url,
+            track_layout=lap.track_layout,
+            imported_at=lap.imported_at,
+            file_checksum=lap.file_checksum,
+            validation_status=lap.validation_status,
+            raw_metadata_json=lap.raw_metadata_json,
+            notes=lap.notes,
         )
         for lap in laps
     ]

@@ -108,3 +108,8 @@ o core de análise genérico:
 O endpoint `POST /analyze-with-reference` usa o provider local para localizar o CSV de
 referência antes de chamar o pipeline. Fontes externas (Garage61) entrarão futuramente
 via provider, sem acoplar o pipeline.
+
+O modelo `ReferenceLap` já possui campos opcionais (`source`, `source_lap_id`,
+`source_url`, `track_layout`, `imported_at`, `file_checksum`, `validation_status`,
+`raw_metadata_json`, `notes`) preparados para suportar um futuro coletor automático
+de voltas (ex.: Garage61), sem afetar a criação manual existente.
