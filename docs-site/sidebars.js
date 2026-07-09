@@ -25,7 +25,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Sobre',
-      items: ['roadmap'],
+      items: ['roadmap', 'product-roadmap'],
     },
   ],
 };
