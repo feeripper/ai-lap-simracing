@@ -94,3 +94,17 @@ Para `throttle`, `brake` (valores 0-1):
 - `low`: `mean_abs_diff > 0` e `mean_abs_diff <= 0.05`
 - `medium`: `mean_abs_diff > 0.05` e `mean_abs_diff <= 0.15`
 - `high`: `mean_abs_diff > 0.15`
+
+## Camada de Reference Providers
+
+A busca por voltas de referência é abstraída em `src/reference_providers/`, mantendo
+o core de análise genérico:
+
+- `ReferenceLapProvider` — interface/protocolo com `find_reference_lap(simulator, car, track)`
+  e `get_reference_csv_path(reference_lap)`.
+- `LocalReferenceLapProvider` — fonte real do MVP; busca a referência ativa no banco.
+- `Garage61ReferenceLapProvider` — stub para integração futura (ver o spike Garage61).
+
+O endpoint `POST /analyze-with-reference` usa o provider local para localizar o CSV de
+referência antes de chamar o pipeline. Fontes externas (Garage61) entrarão futuramente
+via provider, sem acoplar o pipeline.

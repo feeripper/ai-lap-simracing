@@ -10,6 +10,7 @@ from pandas.errors import EmptyDataError
 from src.analysis.comparator import compare_laps
 from src.analysis.insight_generator import generate_insights
 from src.analysis.normalizer import normalize_lap_by_distance
+from src.analysis.telemetry_columns import standardize_telemetry_columns
 
 
 def analyze_lap_files(
@@ -85,12 +86,22 @@ def analyze_lap_files(
     if reference_lap.empty:
         raise ValueError("reference CSV is empty")
 
+    # Standardize column names/scales (e.g. Garage61 exports) before validation.
+    user_lap = standardize_telemetry_columns(user_lap)
+    reference_lap = standardize_telemetry_columns(reference_lap)
+
     # Validate distance column exists
     if distance_column not in user_lap.columns:
-        raise ValueError(f"distance column '{distance_column}' not found in user CSV")
+        raise ValueError(
+            f"distance column '{distance_column}' not found in user CSV. "
+            f"Expected one of: lap_dist_pct, LapDistPct"
+        )
 
     if distance_column not in reference_lap.columns:
-        raise ValueError(f"distance column '{distance_column}' not found in reference CSV")
+        raise ValueError(
+            f"distance column '{distance_column}' not found in reference CSV. "
+            f"Expected one of: lap_dist_pct, LapDistPct"
+        )
 
     # Store raw row counts
     user_rows_raw = len(user_lap)

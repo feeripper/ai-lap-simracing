@@ -24,10 +24,14 @@ outputs/*
 # Node.js
 node_modules/
 docs-site/node_modules/
+web/node_modules/
 
 # Docusaurus build artifacts
 docs-site/build/
 docs-site/.docusaurus/
+
+# Frontend build artifacts
+web/dist/
 
 # Environment variables
 .env
