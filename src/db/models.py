@@ -99,6 +99,17 @@ class ReferenceLap(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Metadata to support future automated reference lap collection (e.g. Garage61).
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
+    source_lap_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    track_layout: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    imported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    file_checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    validation_status: Mapped[str] = mapped_column(String(50), nullable=False, default="validated")
+    raw_metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     simulator: Mapped["Simulator"] = relationship("Simulator", back_populates="reference_laps")
     car: Mapped["Car"] = relationship("Car", back_populates="reference_laps")
     track: Mapped["Track"] = relationship("Track", back_populates="reference_laps")

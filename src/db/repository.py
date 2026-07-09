@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -77,8 +78,29 @@ def create_reference_lap(
     lap_time_seconds: float,
     csv_path: str,
     is_active: bool = True,
+    source: Optional[str] = None,
+    source_lap_id: Optional[str] = None,
+    source_url: Optional[str] = None,
+    track_layout: Optional[str] = None,
+    validation_status: Optional[str] = None,
+    raw_metadata_json: Optional[str] = None,
+    notes: Optional[str] = None,
 ) -> ReferenceLap:
-    """Create a new reference lap. If is_active=True, deactivate any existing active lap for the same combination."""
+    """Create a new reference lap. If is_active=True, deactivate any existing active lap for the same combination.
+
+    If `source` and `source_lap_id` are both provided and a reference lap with that
+    combination already exists, the existing record is returned instead of creating a
+    duplicate. This supports future automated collectors (e.g. Garage61) re-running
+    safely without creating duplicate entries.
+    """
+    resolved_source = source or "manual"
+    resolved_validation_status = validation_status or "validated"
+
+    if source and source_lap_id:
+        existing = get_reference_lap_by_source_id(db, source, source_lap_id)
+        if existing:
+            return existing
+
     if is_active:
         # Deactivate any existing active reference lap for this combination
         db.query(ReferenceLap).filter(
@@ -96,11 +118,66 @@ def create_reference_lap(
         lap_time_seconds=lap_time_seconds,
         csv_path=csv_path,
         is_active=is_active,
+        source=resolved_source,
+        source_lap_id=source_lap_id,
+        source_url=source_url,
+        track_layout=track_layout,
+        imported_at=datetime.utcnow(),
+        validation_status=resolved_validation_status,
+        raw_metadata_json=raw_metadata_json,
+        notes=notes,
     )
     db.add(reference_lap)
     db.commit()
     db.refresh(reference_lap)
     return reference_lap
+
+
+def get_reference_lap_by_source_id(
+    db: Session, source: str, source_lap_id: str
+) -> Optional[ReferenceLap]:
+    """Get a reference lap by its source and source-specific lap id, if it exists."""
+    return (
+        db.query(ReferenceLap)
+        .filter(
+            ReferenceLap.source == source,
+            ReferenceLap.source_lap_id == source_lap_id,
+        )
+        .first()
+    )
+
+
+def list_reference_laps_by_status(db: Session, validation_status: str) -> list[ReferenceLap]:
+    """List all reference laps with a given validation status, ordered by id."""
+    return (
+        db.query(ReferenceLap)
+        .filter(ReferenceLap.validation_status == validation_status)
+        .order_by(ReferenceLap.id)
+        .all()
+    )
+
+
+def activate_reference_lap(db: Session, reference_lap_id: int) -> Optional[ReferenceLap]:
+    """Activate a reference lap, deactivating any other active lap for the same
+    simulator/car/track combination. Returns None if the lap does not exist.
+    """
+    lap = db.query(ReferenceLap).filter(ReferenceLap.id == reference_lap_id).first()
+    if lap is None:
+        return None
+
+    db.query(ReferenceLap).filter(
+        ReferenceLap.simulator_id == lap.simulator_id,
+        ReferenceLap.car_id == lap.car_id,
+        ReferenceLap.track_id == lap.track_id,
+        ReferenceLap.is_active == True,
+        ReferenceLap.id != lap.id,
+    ).update({"is_active": False})
+
+    lap.is_active = True
+    db.add(lap)
+    db.commit()
+    db.refresh(lap)
+    return lap
 
 
 def get_active_reference_lap(

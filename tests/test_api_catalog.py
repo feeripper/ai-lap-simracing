@@ -138,3 +138,6 @@ def test_reference_laps_with_seed(client, db_session, tmp_path):
     assert lap["car"] == "Toyota GR86"
     assert lap["track"] == "Spa"
     assert lap["is_active"] is True
+    assert lap["source"] == "manual"
+    assert lap["validation_status"] == "validated"
+    assert lap["source_lap_id"] is None
