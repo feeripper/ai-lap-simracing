@@ -148,3 +148,76 @@ spike. Serviriam para rastrear a origem de uma volta de referência externa:
 3. Implementar a camada `ReferenceLapProvider` com `LocalReferenceProvider` real e
    `Garage61ReferenceProvider` como stub (ver PR seguinte).
 4. Só então avaliar implementação real do provider Garage61 com cache local.
+
+## Reference Collector Spike
+
+Enquanto o `ReferenceLapProvider` resolve **como consumir** uma volta de referência já
+existente no banco, o **Reference Collector** resolve **como popular** o banco com voltas
+externas. Ele é uma camada separada (`src/reference_collectors/`) que **não é acoplada ao
+pipeline de análise** e roda somente sob demanda (script/admin), nunca no fluxo web.
+
+### Princípios
+
+- **Fonte externa experimental**: o Garage61 é tratado como uma fonte opcional e
+  experimental. Nada no fluxo principal depende dele.
+- **Token esperado**: `GARAGE61_ACCESS_TOKEN`. O collector tenta ler essa variável de
+  ambiente quando um token não é passado explicitamente. Sem token, os métodos que
+  precisam do Garage61 levantam `Garage61TokenMissingError`.
+- **Import opcional**: qualquer biblioteca/wrapper do Garage61 é importada de forma
+  **opcional e defensiva**. Se a dependência não estiver instalada, o collector levanta
+  `Garage61DependencyMissingError` com mensagem clara, sem quebrar o resto do sistema.
+  A dependência **não** é adicionada ao `requirements.txt` nesta fase.
+- **Sem scraping / sem browser**: não fazemos scraping de HTML nem automação de browser,
+  e não burlamos autenticação. Apenas API/cliente oficial, quando/se disponível.
+- **Sem internet em testes**: todos os testes usam mocks do cliente Garage61. Nenhum
+  teste faz chamada real de rede.
+
+### Fluxo de coleta
+
+```
+Reference target (simulator + car + track)
+        |
+        v
+Garage61ReferenceCollector.search_lap_candidates()
+        |
+        v
+Candidate laps (Garage61LapCandidate)
+        |
+        v
+download_lap_csv()  ->  cache local (data/references/...)
+        |
+        v
+Validação de CSV (reaproveita telemetry_columns)
+        |
+        v
+create_reference_lap()  ->  ReferenceLap (source="garage61")
+        |
+        v
+Ativação manual/controlada (somente com --activate-best)
+```
+
+### Regras do collector
+
+- **Salva CSV localmente** em `data/references/<sim>/<car-slug>/<track-slug>/` antes de
+  cadastrar no banco. Esse diretório está no `.gitignore` (não commitamos CSVs).
+- **Referências coletadas** entram com `source="garage61"` e `validation_status` igual a
+  `"validated"` (CSV passou na validação) ou `"rejected"` (CSV inválido).
+- **Sem duplicidade**: se já existir `ReferenceLap` com `source="garage61"` e o mesmo
+  `source_lap_id`, o registro existente é reutilizado.
+- **Ativação não é automática**: por padrão o collector **não** altera a referência ativa.
+  A ativação só acontece quando o script recebe a flag explícita `--activate-best`, que
+  ativa a melhor volta **validada** (menor `lap_time_seconds`).
+- **Fallback manual continua existindo**: `scripts/add_reference_lap.py` e o cadastro
+  manual permanecem válidos e independentes do Garage61.
+
+### Script
+
+`scripts/sync_reference_laps.py` orquestra a coleta:
+
+```
+python -m scripts.sync_reference_laps --simulator "iRacing" --car "Toyota GR86" --track "Spa" --limit 5
+```
+
+Flags: `--simulator`, `--car`, `--track`, `--limit`, `--activate-best`. O script exibe
+mensagens claras quando o token não está configurado, a dependência externa não está
+instalada, nenhum candidato é encontrado ou o CSV é inválido.

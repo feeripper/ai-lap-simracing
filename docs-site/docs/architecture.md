@@ -113,3 +113,12 @@ O modelo `ReferenceLap` já possui campos opcionais (`source`, `source_lap_id`,
 `source_url`, `track_layout`, `imported_at`, `file_checksum`, `validation_status`,
 `raw_metadata_json`, `notes`) preparados para suportar um futuro coletor automático
 de voltas (ex.: Garage61), sem afetar a criação manual existente.
+
+## Camada de Reference Collectors
+
+Enquanto os providers **consomem** referências existentes, os collectors
+(`src/reference_collectors/`) **populam** o banco a partir de fontes externas
+experimentais (ex.: Garage61). Essa camada roda sob demanda (via
+`scripts/sync_reference_laps.py`), usa import opcional para dependências do Garage61 e
+**não é acoplada ao pipeline de análise**. A ativação de uma referência coletada só
+ocorre com flag explícita. Detalhes no spike Garage61.
