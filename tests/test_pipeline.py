@@ -40,6 +40,7 @@ def test_analyze_lap_files_success(tmp_path):
     assert "metadata" in result
     assert "comparison" in result
     assert "insights" in result
+    assert "coaching" in result
 
     # Validate metadata
     assert result["metadata"]["user_csv_path"] == str(user_csv.absolute())
@@ -59,6 +60,11 @@ def test_analyze_lap_files_success(tmp_path):
     assert "priority" in result["insights"]
     assert "recommendations" in result["insights"]
     assert len(result["insights"]["recommendations"]) > 0
+
+    # Validate coaching
+    assert "time_loss" in result["coaching"]
+    assert "driving_issue" in result["coaching"]
+    assert "training_recommendation" in result["coaching"]
 
 
 def test_analyze_lap_files_user_csv_not_found(tmp_path):
@@ -240,6 +246,7 @@ def test_analyze_lap_files_supports_garage61_column_format(tmp_path):
     assert "metadata" in result
     assert "comparison" in result
     assert "insights" in result
+    assert "coaching" in result
     assert result["metadata"]["distance_column"] == "lap_dist_pct"
 
 

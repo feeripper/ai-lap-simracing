@@ -36,11 +36,11 @@ export default function App() {
     setResult(null);
 
     if (!simulator || !car || !track) {
-      setError('Please select simulator, car and track.');
+      setError('Please select a simulator, car and track to continue.');
       return;
     }
     if (!userCsv) {
-      setError('Please select a CSV file with your lap.');
+      setError('Please upload your Garage61 CSV file to analyze your lap.');
       return;
     }
 
@@ -50,13 +50,13 @@ export default function App() {
       setResult(data);
     } catch (err) {
       if (err.status === 404) {
-        setError(err.message || 'Reference lap not found for this selection.');
+        setError(err.message || 'No reference lap found for this car/track combination. Try a different selection.');
       } else if (err.status === 400) {
-        setError(err.message || 'Invalid CSV file.');
+        setError(err.message || 'The CSV file is invalid. Please export a valid Garage61 telemetry file.');
       } else if (err.message === 'Failed to fetch') {
-        setError('Backend is offline. Please start the API server.');
+        setError('Unable to connect to the server. Please ensure the backend is running.');
       } else {
-        setError(err.message || 'Unexpected error during analysis.');
+        setError(err.message || 'Something went wrong during analysis. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -66,9 +66,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>AI Lap Simracing</h1>
+        <div className="header-titles">
+          <h1>AI Lap Coach</h1>
+          <p className="header-subtitle">Telemetry analysis powered by Garage61 data</p>
+        </div>
         <div className={`backend-status status-${backendStatus}`}>
-          Backend: {backendStatus}
+          {backendStatus === 'online' ? '● Online' : '● Offline'}
         </div>
       </header>
 

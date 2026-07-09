@@ -32,21 +32,37 @@ body {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 16px;
-  margin-bottom: 24px;
+  padding-bottom: 20px;
+  margin-bottom: 32px;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .app-header h1 {
-  font-size: 1.6rem;
+  font-size: 1.75rem;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.header-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
   margin: 0;
 }
 
 .backend-status {
-  font-size: 0.85rem;
-  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .status-online {
@@ -64,9 +80,9 @@ body {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 20px;
+  padding: 24px;
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
 .field {
@@ -76,8 +92,17 @@ body {
 }
 
 .field label {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.field-help {
+  font-size: 0.8rem;
   color: var(--muted);
+  margin: 6px 0 0;
+  line-height: 1.4;
 }
 
 .field select,
@@ -85,14 +110,23 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
+  padding: 11px 12px;
   color: var(--text);
   font-size: 0.95rem;
+  transition: border-color 0.15s ease;
+}
+
+.field select:focus,
+.field input[type='file']:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .file-name {
   font-size: 0.8rem;
-  color: var(--muted);
+  color: var(--green);
+  margin-top: 6px;
+  display: block;
 }
 
 button[type='submit'] {
@@ -100,10 +134,20 @@ button[type='submit'] {
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 14px 20px;
   font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  margin-top: 4px;
+}
+
+button[type='submit']:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+button[type='submit']:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 button[type='submit']:disabled {
@@ -113,18 +157,19 @@ button[type='submit']:disabled {
 
 .error-message {
   margin-top: 16px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.1);
   border: 1px solid var(--red);
   color: #fca5a5;
   font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .result-section {
-  margin-top: 28px;
+  margin-top: 32px;
   display: grid;
-  gap: 20px;
+  gap: 24px;
 }
 
 .result-summary,
@@ -133,18 +178,38 @@ button[type='submit']:disabled {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 20px;
+  padding: 24px;
 }
 
 .result-summary h2,
 .recommendations h2,
 .sector-insights h2 {
   margin-top: 0;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .priority {
   text-transform: capitalize;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.summary-text {
+  line-height: 1.6;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.analysis-run-id {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .recommendations ul,
@@ -161,8 +226,14 @@ button[type='submit']:disabled {
   border: 1px solid var(--border);
   border-left-width: 4px;
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   background: var(--bg);
+  transition: transform 0.1s ease;
+}
+
+.rec:hover,
+.sector:hover {
+  transform: translateX(2px);
 }
 
 .severity-high {
@@ -182,19 +253,27 @@ button[type='submit']:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .rec-title,
 .sector-name {
   font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
 }
 
 .rec-severity,
 .sector-metric {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--panel);
 }
 
 .rec-message,
@@ -202,4 +281,5 @@ button[type='submit']:disabled {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+  line-height: 1.5;
 }
