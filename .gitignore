@@ -17,6 +17,9 @@ ai_lap.db
 data/*
 outputs/*
 
+# Collected reference lap CSVs (Garage61 collector cache)
+data/references/
+
 # Keep .gitkeep files for empty directories
 !data/.gitkeep
 !outputs/.gitkeep
