@@ -10,12 +10,17 @@ const sidebars = {
     {
       type: 'category',
       label: 'Uso',
-      items: ['local-usage', 'reference-laps', 'cli-commands'],
+      items: ['local-usage', 'reference-laps', 'cli-commands', 'mvp-web-flow'],
     },
     {
       type: 'category',
       label: 'Referência',
       items: ['telemetry-csv-format', 'architecture'],
+    },
+    {
+      type: 'category',
+      label: 'Integrações',
+      items: ['garage61-spike'],
     },
     {
       type: 'category',

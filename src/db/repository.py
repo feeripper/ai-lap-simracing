@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.db.models import Car, ReferenceLap, Simulator, Track
+from src.db.models import AnalysisRun, Car, ReferenceLap, Simulator, Track
 
 
 def create_simulator(db: Session, name: str) -> Simulator:
@@ -23,6 +23,11 @@ def get_simulator_by_name(db: Session, name: str) -> Optional[Simulator]:
     return db.query(Simulator).filter(Simulator.name == name).first()
 
 
+def get_all_simulators(db: Session) -> list[Simulator]:
+    """Get all simulators ordered by name."""
+    return db.query(Simulator).order_by(Simulator.name).all()
+
+
 def create_car(db: Session, name: str) -> Car:
     """Create a new car."""
     car = Car(name=name)
@@ -35,6 +40,11 @@ def create_car(db: Session, name: str) -> Car:
 def get_car_by_name(db: Session, name: str) -> Optional[Car]:
     """Get a car by name."""
     return db.query(Car).filter(Car.name == name).first()
+
+
+def get_all_cars(db: Session) -> list[Car]:
+    """Get all cars ordered by name."""
+    return db.query(Car).order_by(Car.name).all()
 
 
 def create_track(
@@ -51,6 +61,11 @@ def create_track(
 def get_track_by_name(db: Session, name: str) -> Optional[Track]:
     """Get a track by name."""
     return db.query(Track).filter(Track.name == name).first()
+
+
+def get_all_tracks(db: Session) -> list[Track]:
+    """Get all tracks ordered by name."""
+    return db.query(Track).order_by(Track.name).all()
 
 
 def create_reference_lap(
@@ -117,3 +132,48 @@ def get_all_reference_laps(
         )
         .all()
     )
+
+
+def list_all_reference_laps(db: Session) -> list[ReferenceLap]:
+    """List all reference laps across all combinations, ordered by id."""
+    return db.query(ReferenceLap).order_by(ReferenceLap.id).all()
+
+
+def create_analysis_run(
+    db: Session,
+    analysis_type: str,
+    result_json: str,
+    simulator_name: Optional[str] = None,
+    car_name: Optional[str] = None,
+    track_name: Optional[str] = None,
+    user_csv_filename: Optional[str] = None,
+    reference_csv_path: Optional[str] = None,
+    summary: Optional[str] = None,
+    priority: Optional[str] = None,
+) -> AnalysisRun:
+    """Persist an analysis run and return the created record."""
+    analysis_run = AnalysisRun(
+        analysis_type=analysis_type,
+        result_json=result_json,
+        simulator_name=simulator_name,
+        car_name=car_name,
+        track_name=track_name,
+        user_csv_filename=user_csv_filename,
+        reference_csv_path=reference_csv_path,
+        summary=summary,
+        priority=priority,
+    )
+    db.add(analysis_run)
+    db.commit()
+    db.refresh(analysis_run)
+    return analysis_run
+
+
+def get_analysis_run_by_id(db: Session, analysis_id: int) -> Optional[AnalysisRun]:
+    """Get an analysis run by its id."""
+    return db.query(AnalysisRun).filter(AnalysisRun.id == analysis_id).first()
+
+
+def list_analysis_runs(db: Session) -> list[AnalysisRun]:
+    """List all analysis runs ordered by most recent first."""
+    return db.query(AnalysisRun).order_by(AnalysisRun.created_at.desc(), AnalysisRun.id.desc()).all()

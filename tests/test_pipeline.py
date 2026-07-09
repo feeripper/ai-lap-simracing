@@ -207,3 +207,57 @@ def test_analyze_lap_files_keeps_user_minus_reference_direction(tmp_path):
     # Validate that speed mean_diff is negative (user - reference)
     speed_mean_diff = result["comparison"]["overall"]["metrics"]["speed"]["mean_diff"]
     assert speed_mean_diff < 0
+
+
+def test_analyze_lap_files_supports_garage61_column_format(tmp_path):
+    """Test that Garage61-style CSVs (LapDistPct 0-1, Speed, Brake, etc.) work."""
+    user_csv = tmp_path / "user.csv"
+    user_data = pd.DataFrame({
+        "Speed": [180, 190, 200],
+        "LapDistPct": [0, 0.5, 1.0],
+        "Brake": [0, 0, 0.5],
+        "Throttle": [0.9, 1.0, 0.8],
+        "RPM": [7000, 7200, 7500],
+        "SteeringWheelAngle": [0.1, 0.2, 0.1],
+        "Gear": [3, 4, 5],
+    })
+    user_data.to_csv(user_csv, index=False)
+
+    reference_csv = tmp_path / "reference.csv"
+    reference_data = pd.DataFrame({
+        "Speed": [200, 200, 200],
+        "LapDistPct": [0, 0.5, 1.0],
+        "Brake": [0, 0, 0],
+        "Throttle": [1.0, 1.0, 1.0],
+        "RPM": [7500, 7500, 7500],
+        "SteeringWheelAngle": [0.1, 0.1, 0.1],
+        "Gear": [4, 5, 5],
+    })
+    reference_data.to_csv(reference_csv, index=False)
+
+    result = analyze_lap_files(str(user_csv), str(reference_csv))
+
+    assert "metadata" in result
+    assert "comparison" in result
+    assert "insights" in result
+    assert result["metadata"]["distance_column"] == "lap_dist_pct"
+
+
+def test_analyze_lap_files_no_compatible_distance_column_raises_clear_error(tmp_path):
+    """Test that a clear error is raised when no distance column is compatible."""
+    user_csv = tmp_path / "user.csv"
+    user_data = pd.DataFrame({"Speed": [180, 190, 200]})
+    user_data.to_csv(user_csv, index=False)
+
+    reference_csv = tmp_path / "reference.csv"
+    reference_data = pd.DataFrame({
+        "lap_dist_pct": [0, 50, 100],
+        "speed": [200, 200, 200],
+    })
+    reference_data.to_csv(reference_csv, index=False)
+
+    with pytest.raises(ValueError) as exc_info:
+        analyze_lap_files(str(user_csv), str(reference_csv))
+
+    assert "distance column" in str(exc_info.value)
+    assert "Expected one of" in str(exc_info.value)

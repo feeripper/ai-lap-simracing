@@ -58,6 +58,30 @@ class Track(Base):
         return f"<Track(id={self.id}, name='{self.name}', layout='{self.layout}')>"
 
 
+class AnalysisRun(Base):
+    """Persisted record of an analysis performed through the API."""
+
+    __tablename__ = "analysis_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    simulator_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    car_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    track_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    user_csv_filename: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reference_csv_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    analysis_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    result_json: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AnalysisRun(id={self.id}, type='{self.analysis_type}', "
+            f"priority='{self.priority}')>"
+        )
+
+
 class ReferenceLap(Base):
     """Reference lap model for comparison against user laps."""
 
