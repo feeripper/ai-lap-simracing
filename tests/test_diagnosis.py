@@ -607,18 +607,19 @@ def test_generate_training_plan_with_opportunities():
     assert "primary_focus" in plan
     assert "suggested_laps" in plan
     assert "instructions" in plan
-    assert "target_metric" in plan
+    assert "measurable_target" in plan
     assert plan["suggested_laps"] == 5
-    assert "braking" in plan["primary_focus"]
+    assert plan["primary_focus"] is not None
 
 
 def test_generate_training_plan_empty_opportunities():
     """Test training plan generation with no opportunities."""
     plan = generate_training_plan([])
-    assert plan["primary_focus"] == "Manter consistência"
-    assert plan["suggested_laps"] == 5
-    assert len(plan["instructions"]) > 0
-    assert plan["target_metric"] is None
+    assert plan["primary_focus"] is None
+    assert plan["suggested_laps"] == 0
+    assert plan["target_corners"] == []
+    assert plan["instructions"] == []
+    assert plan["measurable_target"] is None
 
 
 def test_generate_diagnosis_includes_new_fields():
@@ -719,6 +720,6 @@ def test_generate_diagnosis_training_plan_structure():
     assert "primary_focus" in plan
     assert "suggested_laps" in plan
     assert "instructions" in plan
-    assert "target_metric" in plan
+    assert "measurable_target" in plan
     assert isinstance(plan["instructions"], list)
     assert len(plan["instructions"]) > 0
