@@ -113,7 +113,7 @@ def analyze_lap_files(
     reference_rows_raw = len(reference_lap)
 
     # Measure processing time (from normalization through diagnosis generation)
-    start_time = time.monotonic()
+    start_time = time.perf_counter()
 
     # Normalize both laps
     user_normalized = normalize_lap_by_distance(user_lap, distance_column, num_points)
@@ -128,7 +128,10 @@ def analyze_lap_files(
     # Generate diagnosis
     diagnosis = generate_diagnosis(comparison, diagnosis_version=DIAGNOSIS_VERSION)
 
-    processing_time_ms = round((time.monotonic() - start_time) * 1000, 3)
+    # Use the diagnosis summary (based on number of opportunities) for the persisted summary
+    insights["summary"] = diagnosis.get("summary")
+
+    processing_time_ms = round((time.perf_counter() - start_time) * 1000, 6)
 
     # Surface warnings from diagnosis or validation
     warnings = diagnosis.get("warnings", [])

@@ -120,15 +120,33 @@ def infer_probable_cause(
     return "unknown_or_low_confidence"
 
 
-def calculate_confidence(metrics: dict) -> Literal["high", "medium", "low"]:
+def calculate_confidence(
+    metrics: dict,
+    cause: Literal[
+        "braking_too_early",
+        "braking_too_late",
+        "braking_too_long",
+        "excessive_entry_speed",
+        "low_minimum_speed",
+        "late_throttle",
+        "partial_throttle_on_exit",
+        "poor_exit_speed",
+        "unknown_or_low_confidence",
+    ],
+) -> Literal["high", "medium", "low"]:
     """Calculate confidence level based on metric availability and consistency.
+
+    If the probable cause is unknown, confidence is always low.
 
     Args:
         metrics: Dictionary with speed, throttle, brake data
+        cause: Inferred probable cause for this opportunity
 
     Returns:
         Confidence level: high, medium, or low
     """
+    if cause == "unknown_or_low_confidence":
+        return "low"
     speed_data = metrics.get("speed", {})
     throttle_data = metrics.get("throttle", {})
     brake_data = metrics.get("brake", {})
@@ -209,7 +227,7 @@ def build_recommendation(
         return f"Sua velocidade de saída está {abs(speed_diff):.0f} km/h abaixo da referência. Pratique aceleração mais agressiva na saída de curva."
 
     else:
-        return "Compare sua telemetria com a referência para identificar o padrão específico de perda de tempo."
+        return "Faça cinco voltas buscando consistência neste setor e compare velocidade mínima, ponto de frenagem e retomada do acelerador antes de alterar sua técnica."
 
 
 def _build_training_focus(phase: str, cause: str) -> str:
@@ -286,7 +304,7 @@ def generate_top_opportunities(comparison: dict, max_opportunities: int = 3) -> 
         # Classify phase, cause, confidence
         phase = classify_corner_phase(sector_metrics)
         cause = infer_probable_cause(sector_metrics, phase)
-        confidence = calculate_confidence(sector_metrics)
+        confidence = calculate_confidence(sector_metrics, cause)
 
         # Build recommendation
         recommendation = build_recommendation(phase, cause, sector_metrics)
@@ -333,10 +351,16 @@ def generate_training_plan(opportunities: list[dict]) -> dict:
     primary_focus = top_opportunity.get("training_focus", "general")
     target_corners = [top_opportunity["corner"]]
 
-    # Build instructions based on opportunities
+    # Build instructions based on opportunities, deduplicating identical recommendations
+    # while preserving order and the rank of the first occurrence.
+    seen_recommendations: set[str] = set()
     instructions = []
     for opp in opportunities:
-        instructions.append(f"Prioridade {opp['rank']}: {opp['recommendation']}")
+        recommendation = opp["recommendation"]
+        if recommendation in seen_recommendations:
+            continue
+        seen_recommendations.add(recommendation)
+        instructions.append(f"Prioridade {opp['rank']}: {recommendation}")
 
     # Add general guidance
     instructions.append(
@@ -351,11 +375,12 @@ def generate_training_plan(opportunities: list[dict]) -> dict:
     target_reduction = round(top_loss * 0.3, 3)
     measurable_target = f"Reduzir aproximadamente {target_reduction:.3f} s em {top_opportunity['corner']}."
 
-    # Secondary focuses from remaining opportunities
-    secondary_focuses = [
-        opp.get("training_focus", "general")
-        for opp in opportunities[1:]
-    ]
+    # Secondary focuses from remaining opportunities, deduplicated and excluding primary
+    secondary_focuses: list[str] = []
+    for opp in opportunities[1:]:
+        focus = opp.get("training_focus", "general")
+        if focus != primary_focus and focus not in secondary_focuses:
+            secondary_focuses.append(focus)
 
     return {
         "primary_focus": primary_focus,
@@ -612,6 +637,14 @@ def generate_diagnosis(comparison: dict, diagnosis_version: str = "1.0") -> dict
     # Generate new structured output
     top_opportunities = generate_top_opportunities(comparison, max_opportunities=3)
     training_plan = generate_training_plan(top_opportunities)
+
+    # Generate summary based on the actual number of opportunities
+    if top_opportunities:
+        count = len(top_opportunities)
+        word = "recomendação" if count == 1 else "recomendações"
+        summary = f"Comparação completa com {count} {word} para melhorar sua volta."
+    else:
+        summary = "Sua volta está muito próxima da referência. Bom trabalho!"
 
     # Add warnings for low confidence or missing corner names
     for opp in top_opportunities:

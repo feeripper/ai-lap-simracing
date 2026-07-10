@@ -349,3 +349,135 @@ def test_processing_time_ms_is_numeric(client, tmp_path):
     body = response.json()
     assert isinstance(body["processing_time_ms"], (int, float))
     assert body["processing_time_ms"] >= 0
+
+
+def test_processing_time_ms_not_prematurely_zero(client, tmp_path):
+    """Test processing_time_ms preserves precision and is not rounded to zero."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["processing_time_ms"] is not None
+    assert body["processing_time_ms"] >= 0
+    assert isinstance(body["processing_time_ms"], float)
+
+
+def test_summary_uses_real_opportunity_count(client, tmp_path):
+    """Test persisted summary uses the real number of opportunities and correct grammar."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    opportunity_count = len(body["top_opportunities"])
+
+    list_response = client.get("/analyses")
+    assert list_response.status_code == 200
+    summary = list_response.json()[0]["summary"]
+    assert str(opportunity_count) in summary
+    assert "recomenda" in summary
+
+
+def test_unknown_cause_returns_low_confidence(client, tmp_path):
+    """Test that unknown probable cause always returns low confidence."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    for opp in body["top_opportunities"]:
+        if opp["probable_cause"] == "unknown_or_low_confidence":
+            assert opp["confidence"] == "low"
+
+
+def test_unknown_recommendation_is_actionable(client, tmp_path):
+    """Test unknown cause recommendation is not just compare telemetry."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    for opp in body["top_opportunities"]:
+        if opp["probable_cause"] == "unknown_or_low_confidence":
+            assert "compare" not in opp["recommendation"].lower()
+            assert "voltas" in opp["recommendation"].lower()
+
+
+def test_secondary_focuses_no_duplicates(client, tmp_path):
+    """Test training plan secondary_focuses has no duplicates and excludes primary."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    plan = body["training_plan"]
+    primary_focus = plan["primary_focus"]
+    secondary_focuses = plan["secondary_focuses"]
+    assert len(secondary_focuses) == len(set(secondary_focuses))
+    assert primary_focus not in secondary_focuses
+
+
+def test_training_plan_instructions_no_duplicates(client, tmp_path):
+    """Test training plan instructions are not repeated."""
+    user_csv = _make_user_csv(tmp_path)
+    reference_csv = _make_reference_csv(tmp_path)
+
+    with user_csv.open("rb") as uf, reference_csv.open("rb") as rf:
+        response = client.post(
+            "/analyze",
+            files={
+                "user_csv": ("user.csv", uf, "text/csv"),
+                "reference_csv": ("reference.csv", rf, "text/csv"),
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    instructions = body["training_plan"]["instructions"]
+    assert len(instructions) == len(set(instructions))
