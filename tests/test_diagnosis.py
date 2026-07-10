@@ -103,7 +103,7 @@ def test_generate_diagnosis_with_time_loss():
     assert "training_focus" in result
 
     assert result["overall_lap_delta_seconds"] > 0
-    assert "perdendo" in result["summary"].lower()
+    assert "recomenda" in result["summary"].lower()
     assert len(result["priority_items"]) > 0
     assert result["priority_items"][0]["priority"] == 1
     assert "location" in result["priority_items"][0]
@@ -446,7 +446,7 @@ def test_calculate_confidence_high():
         "throttle": {"mean_diff": -0.2},
         "brake": {"mean_diff": 0.1}
     }
-    confidence = calculate_confidence(metrics)
+    confidence = calculate_confidence(metrics, "braking_too_long")
     assert confidence == "high"
 
 
@@ -457,7 +457,7 @@ def test_calculate_confidence_medium():
         "throttle": {},
         "brake": {}
     }
-    confidence = calculate_confidence(metrics)
+    confidence = calculate_confidence(metrics, "low_minimum_speed")
     assert confidence == "medium"
 
 
@@ -468,7 +468,7 @@ def test_calculate_confidence_low():
         "throttle": {},
         "brake": {}
     }
-    confidence = calculate_confidence(metrics)
+    confidence = calculate_confidence(metrics, "poor_exit_speed")
     assert confidence == "low"
 
 
@@ -607,18 +607,19 @@ def test_generate_training_plan_with_opportunities():
     assert "primary_focus" in plan
     assert "suggested_laps" in plan
     assert "instructions" in plan
-    assert "target_metric" in plan
+    assert "measurable_target" in plan
     assert plan["suggested_laps"] == 5
-    assert "braking" in plan["primary_focus"]
+    assert plan["primary_focus"] is not None
 
 
 def test_generate_training_plan_empty_opportunities():
     """Test training plan generation with no opportunities."""
     plan = generate_training_plan([])
-    assert plan["primary_focus"] == "Manter consistência"
-    assert plan["suggested_laps"] == 5
-    assert len(plan["instructions"]) > 0
-    assert plan["target_metric"] is None
+    assert plan["primary_focus"] is None
+    assert plan["suggested_laps"] == 0
+    assert plan["target_corners"] == []
+    assert plan["instructions"] == []
+    assert plan["measurable_target"] is None
 
 
 def test_generate_diagnosis_includes_new_fields():
@@ -719,6 +720,128 @@ def test_generate_diagnosis_training_plan_structure():
     assert "primary_focus" in plan
     assert "suggested_laps" in plan
     assert "instructions" in plan
-    assert "target_metric" in plan
+    assert "measurable_target" in plan
     assert isinstance(plan["instructions"], list)
     assert len(plan["instructions"]) > 0
+
+
+def test_unknown_confidence_is_always_low():
+    """Test that unknown cause always yields low confidence."""
+    comparison = {
+        "overall": {
+            "metrics": {
+                "speed": {"mean_diff": -10.0},
+                "throttle": {"mean_diff": -0.2},
+                "brake": {"mean_diff": 0.1}
+            }
+        },
+        "sectors": [
+            {
+                "name": "Sector 1",
+                "metrics": {
+                    "speed": {"mean_diff": -10.0, "mean_abs_diff": 10.0},
+                    "throttle": {"mean_diff": -0.2, "mean_abs_diff": 0.2},
+                    "brake": {"mean_diff": 0.1, "mean_abs_diff": 0.1}
+                }
+            }
+        ]
+    }
+    result = generate_diagnosis(comparison)
+    for opp in result["top_opportunities"]:
+        if opp["probable_cause"] == "unknown_or_low_confidence":
+            assert opp["confidence"] == "low"
+
+
+def test_unknown_cause_never_high_or_medium_confidence():
+    """Test that unknown cause never returns high or medium confidence."""
+    metrics = {
+        "speed": {"mean_diff": -10.0},
+        "throttle": {"mean_diff": -0.2},
+        "brake": {"mean_diff": 0.1}
+    }
+    assert calculate_confidence(metrics, "unknown_or_low_confidence") == "low"
+
+
+def test_unknown_recommendation_is_actionable():
+    """Test that unknown cause recommendation is actionable and not just compare telemetry."""
+    recommendation = build_recommendation("apex", "unknown_or_low_confidence", {"speed": {"mean_diff": -10.0}})
+    assert recommendation != "Compare sua telemetria com a referência para identificar o padrão específico de perda de tempo."
+    assert "voltas" in recommendation.lower()
+    assert "frenagem" in recommendation.lower()
+    assert "acelerador" in recommendation.lower()
+
+
+def test_training_plan_secondary_focuses_no_duplicates():
+    """Test that secondary_focuses has no duplicates and excludes primary focus."""
+    opportunities = [
+        {"rank": 1, "corner": "Sector 1", "training_focus": "brake_release", "recommendation": "r1", "estimated_time_loss": 0.3},
+        {"rank": 2, "corner": "Sector 2", "training_focus": "brake_release", "recommendation": "r2", "estimated_time_loss": 0.2},
+        {"rank": 3, "corner": "Sector 3", "training_focus": "throttle_application", "recommendation": "r3", "estimated_time_loss": 0.1},
+    ]
+    plan = generate_training_plan(opportunities)
+    assert plan["secondary_focuses"] == ["throttle_application"]
+
+
+def test_training_plan_secondary_focuses_empty_when_only_general():
+    """Test that secondary_focuses is empty when only general focus exists."""
+    opportunities = [
+        {"rank": 1, "corner": "Sector 1", "training_focus": "general", "recommendation": "r1", "estimated_time_loss": 0.3},
+        {"rank": 2, "corner": "Sector 2", "training_focus": "general", "recommendation": "r2", "estimated_time_loss": 0.2},
+    ]
+    plan = generate_training_plan(opportunities)
+    assert plan["secondary_focuses"] == []
+
+
+def test_training_plan_instructions_not_repeated():
+    """Test that training plan instructions are not repeated."""
+    opportunities = [
+        {"rank": 1, "corner": "Sector 1", "recommendation": "Mesma mensagem", "estimated_time_loss": 0.3},
+        {"rank": 2, "corner": "Sector 2", "recommendation": "Mesma mensagem", "estimated_time_loss": 0.2},
+        {"rank": 3, "corner": "Sector 3", "recommendation": "Mensagem diferente", "estimated_time_loss": 0.1},
+    ]
+    plan = generate_training_plan(opportunities)
+    instructions = plan["instructions"]
+    assert instructions.count("Prioridade 1: Mesma mensagem") == 1
+    assert instructions.count("Prioridade 2: Mesma mensagem") == 0
+    assert instructions.count("Prioridade 3: Mesma mensagem") == 0
+    assert instructions.count("Prioridade 3: Mensagem diferente") == 1
+
+
+def test_generate_diagnosis_summary_uses_opportunity_count():
+    """Test that diagnosis summary uses the real number of opportunities."""
+    comparison = {
+        "overall": {
+            "metrics": {
+                "speed": {"mean_diff": -10.0},
+                "throttle": {"mean_diff": -0.2},
+                "brake": {"mean_diff": 0.1}
+            }
+        },
+        "sectors": [
+            {"name": "Sector 1", "metrics": {"speed": {"mean_diff": -10.0, "mean_abs_diff": 10.0}}},
+            {"name": "Sector 2", "metrics": {"speed": {"mean_diff": -12.0, "mean_abs_diff": 12.0}}},
+            {"name": "Sector 3", "metrics": {"speed": {"mean_diff": -8.0, "mean_abs_diff": 8.0}}},
+        ]
+    }
+    result = generate_diagnosis(comparison)
+    count = len(result["top_opportunities"])
+    assert str(count) in result["summary"]
+    assert "recomendações" in result["summary"]
+
+
+def test_generate_diagnosis_summary_singular():
+    """Test correct singular in summary."""
+    comparison = {
+        "overall": {
+            "metrics": {
+                "speed": {"mean_diff": -10.0},
+                "throttle": {"mean_diff": -0.2},
+                "brake": {"mean_diff": 0.1}
+            }
+        },
+        "sectors": [
+            {"name": "Sector 1", "metrics": {"speed": {"mean_diff": -10.0, "mean_abs_diff": 10.0}}},
+        ]
+    }
+    result = generate_diagnosis(comparison)
+    assert result["summary"] == "Comparação completa com 1 recomendação para melhorar sua volta."

@@ -6,6 +6,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,13 +15,16 @@ from sqlalchemy.orm import Session
 from src.analysis.pipeline import analyze_lap_files
 from src.api.dependencies import get_db
 from src.api.schemas import (
+    AnalysisDetailOut,
     AnalysisRunSummaryOut,
+    AnalysisSummaryResponseOut,
     CarOut,
     CatalogOut,
     ReferenceLapOut,
     SimulatorOut,
     TrackOut,
 )
+from src.api.serialization import safe_json_dumps, safe_jsonable
 from src.db.repository import (
     create_analysis_run,
     get_all_cars,
@@ -87,7 +91,7 @@ def _persist_analysis_run(
     analysis_run = create_analysis_run(
         db,
         analysis_type=analysis_type,
-        result_json=json.dumps(result, ensure_ascii=False),
+        result_json=safe_json_dumps(result, ensure_ascii=False),
         simulator_name=simulator_name,
         car_name=car_name,
         track_name=track_name,
@@ -97,6 +101,60 @@ def _persist_analysis_run(
         priority=insights.get("priority"),
     )
     return analysis_run.id
+
+
+def _build_analysis_response_from_dict(result: dict, analysis_id: int) -> dict:
+    """Build a canonical analysis response from a fresh pipeline result."""
+    status = result.get("status", "completed")
+    diagnosis_version = result.get("diagnosis_version", "1.0")
+    processing_time_ms = result.get("processing_time_ms", 0.0)
+    warnings = result.get("warnings", [])
+    metadata = result.get("metadata", {})
+    comparison = result.get("comparison")
+    insights = result.get("insights")
+    diagnosis = result.get("diagnosis")
+    top_opportunities = result.get("top_opportunities", [])
+    training_plan = result.get("training_plan", {})
+
+    # If this is an older record without top-level top_opportunities, derive from diagnosis
+    if not top_opportunities and diagnosis:
+        top_opportunities = diagnosis.get("top_opportunities", [])
+        training_plan = diagnosis.get("training_plan", {})
+
+    response = {
+        "analysis_id": analysis_id,
+        "analysis_run_id": analysis_id,
+        "status": status,
+        "diagnosis_version": diagnosis_version,
+        "processing_time_ms": processing_time_ms,
+        "simulator": result.get("simulator"),
+        "car": result.get("car"),
+        "track": result.get("track"),
+        "created_at": None,
+        "metadata": safe_jsonable(metadata),
+        "comparison": safe_jsonable(comparison),
+        "insights": safe_jsonable(insights),
+        "diagnosis": safe_jsonable(diagnosis),
+        "top_opportunities": safe_jsonable(top_opportunities),
+        "training_plan": safe_jsonable(training_plan),
+        "warnings": safe_jsonable(warnings),
+    }
+
+    return response
+
+
+def _build_analysis_response(run: Any) -> dict:
+    """Build a canonical analysis response from a persisted AnalysisRun.
+
+    Ensures older records without new fields still produce a valid response.
+    """
+    result = json.loads(run.result_json)
+    response = _build_analysis_response_from_dict(result, run.id)
+    response["created_at"] = run.created_at
+    response["simulator"] = run.simulator_name
+    response["car"] = run.car_name
+    response["track"] = run.track_name
+    return response
 
 
 @app.get("/health")
@@ -163,7 +221,7 @@ def list_reference_laps(db: Session = Depends(get_db)):
     ]
 
 
-@app.post("/analyze")
+@app.post("/analyze", response_model=AnalysisDetailOut)
 def analyze(
     user_csv: UploadFile = File(...),
     reference_csv: UploadFile = File(...),
@@ -200,10 +258,10 @@ def analyze(
     )
     result["analysis_run_id"] = analysis_run_id
 
-    return result
+    return _build_analysis_response_from_dict(result, analysis_run_id)
 
 
-@app.post("/analyze-with-reference")
+@app.post("/analyze-with-reference", response_model=AnalysisDetailOut)
 def analyze_with_reference(
     user_csv: UploadFile = File(...),
     simulator: str = Form(...),
@@ -255,23 +313,47 @@ def analyze_with_reference(
         track_name=track,
     )
     result["analysis_run_id"] = analysis_run_id
+    result["simulator"] = simulator
+    result["car"] = car
+    result["track"] = track
 
-    return result
+    return _build_analysis_response_from_dict(result, analysis_run_id)
 
 
-@app.get("/analyses", response_model=list[AnalysisRunSummaryOut])
+@app.get("/analyses", response_model=list[AnalysisSummaryResponseOut])
 def list_analyses(db: Session = Depends(get_db)):
     """List all persisted analysis runs (summary view), most recent first."""
-    return [AnalysisRunSummaryOut.model_validate(run) for run in list_analysis_runs(db)]
+    runs = list_analysis_runs(db)
+    summaries = []
+    for run in runs:
+        result = json.loads(run.result_json)
+        diagnosis = result.get("diagnosis", {})
+        top_opportunities = result.get("top_opportunities", diagnosis.get("top_opportunities", []))
+        training_plan = result.get("training_plan", diagnosis.get("training_plan", {}))
+        summaries.append({
+            "id": run.id,
+            "analysis_id": run.id,
+            "created_at": run.created_at,
+            "status": result.get("status", "completed"),
+            "diagnosis_version": result.get("diagnosis_version", "1.0"),
+            "simulator": run.simulator_name,
+            "car": run.car_name,
+            "track": run.track_name,
+            "analysis_type": run.analysis_type,
+            "total_time_loss": diagnosis.get("overall_lap_delta_seconds"),
+            "number_of_opportunities": len(top_opportunities),
+            "primary_focus": training_plan.get("primary_focus"),
+            "summary": run.summary,
+            "priority": run.priority,
+        })
+    return summaries
 
 
-@app.get("/analyses/{analysis_id}")
+@app.get("/analyses/{analysis_id}", response_model=AnalysisDetailOut)
 def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
     """Return the full persisted analysis result for a given id."""
     run = get_analysis_run_by_id(db, analysis_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"analysis not found: {analysis_id}")
 
-    result = json.loads(run.result_json)
-    result["analysis_run_id"] = run.id
-    return result
+    return _build_analysis_response(run)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,9 @@ from src.analysis.diagnosis import generate_diagnosis
 from src.analysis.insight_generator import generate_insights
 from src.analysis.normalizer import normalize_lap_by_distance
 from src.analysis.telemetry_columns import standardize_telemetry_columns
+
+
+DIAGNOSIS_VERSION = "1.0"
 
 
 def analyze_lap_files(
@@ -108,6 +112,9 @@ def analyze_lap_files(
     user_rows_raw = len(user_lap)
     reference_rows_raw = len(reference_lap)
 
+    # Measure processing time (from normalization through diagnosis generation)
+    start_time = time.perf_counter()
+
     # Normalize both laps
     user_normalized = normalize_lap_by_distance(user_lap, distance_column, num_points)
     reference_normalized = normalize_lap_by_distance(reference_lap, distance_column, num_points)
@@ -119,10 +126,21 @@ def analyze_lap_files(
     insights = generate_insights(comparison)
 
     # Generate diagnosis
-    diagnosis = generate_diagnosis(comparison)
+    diagnosis = generate_diagnosis(comparison, diagnosis_version=DIAGNOSIS_VERSION)
+
+    # Use the diagnosis summary (based on number of opportunities) for the persisted summary
+    insights["summary"] = diagnosis.get("summary")
+
+    processing_time_ms = round((time.perf_counter() - start_time) * 1000, 6)
+
+    # Surface warnings from diagnosis or validation
+    warnings = diagnosis.get("warnings", [])
 
     # Return complete result
     return {
+        "status": "completed",
+        "diagnosis_version": DIAGNOSIS_VERSION,
+        "processing_time_ms": processing_time_ms,
         "metadata": {
             "user_csv_path": str(user_csv.absolute()),
             "reference_csv_path": str(reference_csv.absolute()),
@@ -135,4 +153,7 @@ def analyze_lap_files(
         "comparison": comparison,
         "insights": insights,
         "diagnosis": diagnosis,
+        "top_opportunities": diagnosis.get("top_opportunities", []),
+        "training_plan": diagnosis.get("training_plan", {}),
+        "warnings": warnings,
     }

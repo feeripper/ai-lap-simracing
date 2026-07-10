@@ -120,15 +120,33 @@ def infer_probable_cause(
     return "unknown_or_low_confidence"
 
 
-def calculate_confidence(metrics: dict) -> Literal["high", "medium", "low"]:
+def calculate_confidence(
+    metrics: dict,
+    cause: Literal[
+        "braking_too_early",
+        "braking_too_late",
+        "braking_too_long",
+        "excessive_entry_speed",
+        "low_minimum_speed",
+        "late_throttle",
+        "partial_throttle_on_exit",
+        "poor_exit_speed",
+        "unknown_or_low_confidence",
+    ],
+) -> Literal["high", "medium", "low"]:
     """Calculate confidence level based on metric availability and consistency.
+
+    If the probable cause is unknown, confidence is always low.
 
     Args:
         metrics: Dictionary with speed, throttle, brake data
+        cause: Inferred probable cause for this opportunity
 
     Returns:
         Confidence level: high, medium, or low
     """
+    if cause == "unknown_or_low_confidence":
+        return "low"
     speed_data = metrics.get("speed", {})
     throttle_data = metrics.get("throttle", {})
     brake_data = metrics.get("brake", {})
@@ -209,7 +227,37 @@ def build_recommendation(
         return f"Sua velocidade de saída está {abs(speed_diff):.0f} km/h abaixo da referência. Pratique aceleração mais agressiva na saída de curva."
 
     else:
-        return "Compare sua telemetria com a referência para identificar o padrão específico de perda de tempo."
+        return "Faça cinco voltas buscando consistência neste setor e compare velocidade mínima, ponto de frenagem e retomada do acelerador antes de alterar sua técnica."
+
+
+def _build_training_focus(phase: str, cause: str) -> str:
+    """Map phase/cause to a short training focus keyword."""
+    if cause in ("braking_too_early", "braking_too_long"):
+        return "brake_release"
+    if cause == "excessive_entry_speed":
+        return "entry_speed"
+    if cause == "low_minimum_speed":
+        return "min_speed"
+    if cause in ("late_throttle", "partial_throttle_on_exit"):
+        return "throttle_application"
+    if cause == "poor_exit_speed":
+        return "exit_speed"
+    return "general"
+
+
+def _sanitize_evidence(metrics: dict) -> dict:
+    """Return a small, serializable evidence dict from sector metrics."""
+    sanitized: dict[str, dict[str, float]] = {}
+    for metric, values in metrics.items():
+        if isinstance(values, dict):
+            sanitized[metric] = {}
+            for key, value in values.items():
+                try:
+                    float_value = float(value)
+                    sanitized[metric][key] = round(float_value, 3)
+                except (TypeError, ValueError):
+                    continue
+    return sanitized
 
 
 def generate_top_opportunities(comparison: dict, max_opportunities: int = 3) -> list[dict]:
@@ -256,20 +304,23 @@ def generate_top_opportunities(comparison: dict, max_opportunities: int = 3) -> 
         # Classify phase, cause, confidence
         phase = classify_corner_phase(sector_metrics)
         cause = infer_probable_cause(sector_metrics, phase)
-        confidence = calculate_confidence(sector_metrics)
+        confidence = calculate_confidence(sector_metrics, cause)
 
         # Build recommendation
         recommendation = build_recommendation(phase, cause, sector_metrics)
+        training_focus = _build_training_focus(phase, cause)
 
         opportunities.append({
             "rank": rank,
             "corner": sector_name,
+            "corner_name": sector_name,
             "phase": phase,
             "estimated_time_loss": round(loss_seconds, 3),
             "confidence": confidence,
+            "evidence": _sanitize_evidence(sector_metrics),
             "probable_cause": cause,
             "recommendation": recommendation,
-            "evidence": sector_metrics
+            "training_focus": training_focus
         })
 
     return opportunities
@@ -282,27 +333,34 @@ def generate_training_plan(opportunities: list[dict]) -> dict:
         opportunities: List of top opportunities from generate_top_opportunities
 
     Returns:
-        Training plan with primary focus, suggested laps, and instructions.
+        Training plan with primary focus, suggested laps, target corners,
+        instructions, measurable target, and secondary focuses.
     """
     if not opportunities:
         return {
-            "primary_focus": "Manter consistência",
-            "suggested_laps": 5,
-            "instructions": [
-                "Continue praticando para manter consistência.",
-                "Compare sua telemetria com a referência regularmente."
-            ],
-            "target_metric": None
+            "primary_focus": None,
+            "suggested_laps": 0,
+            "target_corners": [],
+            "instructions": [],
+            "measurable_target": None,
+            "secondary_focuses": []
         }
 
     # Primary focus is the top opportunity
     top_opportunity = opportunities[0]
-    primary_focus = f"{top_opportunity['phase']} em {top_opportunity['corner']}"
+    primary_focus = top_opportunity.get("training_focus", "general")
+    target_corners = [top_opportunity["corner"]]
 
-    # Build instructions based on opportunities
+    # Build instructions based on opportunities, deduplicating identical recommendations
+    # while preserving order and the rank of the first occurrence.
+    seen_recommendations: set[str] = set()
     instructions = []
     for opp in opportunities:
-        instructions.append(f"Prioridade {opp['rank']}: {opp['recommendation']}")
+        recommendation = opp["recommendation"]
+        if recommendation in seen_recommendations:
+            continue
+        seen_recommendations.add(recommendation)
+        instructions.append(f"Prioridade {opp['rank']}: {recommendation}")
 
     # Add general guidance
     instructions.append(
@@ -315,13 +373,22 @@ def generate_training_plan(opportunities: list[dict]) -> dict:
     # Calculate target metric (aim to reduce top loss by 30%)
     top_loss = top_opportunity["estimated_time_loss"]
     target_reduction = round(top_loss * 0.3, 3)
-    target_metric = f"Reduzir perda em {top_opportunity['corner']} em {target_reduction:.3f}s"
+    measurable_target = f"Reduzir aproximadamente {target_reduction:.3f} s em {top_opportunity['corner']}."
+
+    # Secondary focuses from remaining opportunities, deduplicated and excluding primary
+    secondary_focuses: list[str] = []
+    for opp in opportunities[1:]:
+        focus = opp.get("training_focus", "general")
+        if focus != primary_focus and focus not in secondary_focuses:
+            secondary_focuses.append(focus)
 
     return {
         "primary_focus": primary_focus,
         "suggested_laps": 5,
+        "target_corners": target_corners,
         "instructions": instructions,
-        "target_metric": target_metric
+        "measurable_target": measurable_target,
+        "secondary_focuses": secondary_focuses
     }
 
 
@@ -426,7 +493,7 @@ def estimate_time_loss_from_speed(comparison: dict) -> dict:
     }
 
 
-def generate_diagnosis(comparison: dict) -> dict:
+def generate_diagnosis(comparison: dict, diagnosis_version: str = "1.0") -> dict:
     """Generate driver-friendly coaching diagnosis with clear priority ordering.
 
     This is the AI simracing coach output that tells the driver:
@@ -437,21 +504,25 @@ def generate_diagnosis(comparison: dict) -> dict:
 
     Args:
         comparison: Dictionary returned by compare_laps
+        diagnosis_version: Version string for the diagnosis output
 
     Returns:
         Dictionary with driver-friendly diagnosis:
         {
+            "diagnosis_version": "1.0",
             "overall_lap_delta_seconds": 2.5,
             "summary": "You are losing 2.5s compared to the reference lap.",
             "priority_items": [...],  # Legacy format for backward compatibility
             "likely_driver_issue": "...",
             "training_focus": "...",
             "top_opportunities": [...],  # New structured format
-            "training_plan": {...}      # New training plan
+            "training_plan": {...},      # New training plan
+            "warnings": []
         }
     """
     time_loss = estimate_time_loss_from_speed(comparison)
     overall_delta = time_loss["total_time_loss_seconds"]
+    warnings: list[str] = []
 
     # Sort sectors by time loss (highest first)
     sorted_sectors = sorted(
@@ -567,12 +638,31 @@ def generate_diagnosis(comparison: dict) -> dict:
     top_opportunities = generate_top_opportunities(comparison, max_opportunities=3)
     training_plan = generate_training_plan(top_opportunities)
 
+    # Generate summary based on the actual number of opportunities
+    if top_opportunities:
+        count = len(top_opportunities)
+        word = "recomendação" if count == 1 else "recomendações"
+        summary = f"Comparação completa com {count} {word} para melhorar sua volta."
+    else:
+        summary = "Sua volta está muito próxima da referência. Bom trabalho!"
+
+    # Add warnings for low confidence or missing corner names
+    for opp in top_opportunities:
+        if opp["confidence"] == "low":
+            warnings.append(
+                f"Baixa confiança na oportunidade {opp['rank']} ({opp['corner']})."
+            )
+    if not comparison.get("sectors"):
+        warnings.append("Análise baseada apenas em métricas gerais da volta.")
+
     return {
+        "diagnosis_version": diagnosis_version,
         "overall_lap_delta_seconds": overall_delta,
         "summary": summary,
         "priority_items": priority_items,  # Legacy format
         "likely_driver_issue": likely_issue,
         "training_focus": training_focus,
         "top_opportunities": top_opportunities,  # New structured format
-        "training_plan": training_plan  # New training plan
+        "training_plan": training_plan,  # New training plan
+        "warnings": warnings
     }
