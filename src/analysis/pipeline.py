@@ -8,6 +8,7 @@ import pandas as pd
 from pandas.errors import EmptyDataError
 
 from src.analysis.comparator import compare_laps
+from src.analysis.diagnosis import generate_diagnosis
 from src.analysis.insight_generator import generate_insights
 from src.analysis.normalizer import normalize_lap_by_distance
 from src.analysis.telemetry_columns import standardize_telemetry_columns
@@ -117,6 +118,9 @@ def analyze_lap_files(
     # Generate insights
     insights = generate_insights(comparison)
 
+    # Generate diagnosis
+    diagnosis = generate_diagnosis(comparison)
+
     # Return complete result
     return {
         "metadata": {
@@ -130,4 +134,5 @@ def analyze_lap_files(
         },
         "comparison": comparison,
         "insights": insights,
+        "diagnosis": diagnosis,
     }
