@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { analyzeWithReference, getCatalog, getHealth } from './api/client.js';
 import AnalyzeForm from './components/AnalyzeForm.jsx';
 import ResultSummary from './components/ResultSummary.jsx';
+import TopOpportunities from './components/TopOpportunities.jsx';
+import TrainingPlan from './components/TrainingPlan.jsx';
 import RecommendationsList from './components/RecommendationsList.jsx';
 import SectorInsights from './components/SectorInsights.jsx';
 
@@ -93,6 +95,8 @@ export default function App() {
         {result && (
           <section className="result-section">
             <ResultSummary result={result} />
+            <TopOpportunities opportunities={result.top_opportunities || result.diagnosis?.top_opportunities} />
+            <TrainingPlan plan={result.training_plan || result.diagnosis?.training_plan} />
             <RecommendationsList recommendations={result.insights?.recommendations} />
             <SectorInsights sectorInsights={result.insights?.sector_insights} />
           </section>
